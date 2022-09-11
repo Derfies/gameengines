@@ -166,7 +166,7 @@ class MapReaderBase(metaclass=abc.ABCMeta):
     def map_cls(cls):
         """"""
 
-    def __call__(self, file_path):
+    def __call__(self, file_path: str):
         with open(file_path, 'rb') as file:
             header = self.get_header(file)
             numsectors = self.get_numsectors(file)
