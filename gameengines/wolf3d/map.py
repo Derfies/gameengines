@@ -4,6 +4,9 @@ import sys
 import numpy as np
 
 
+HAVOC_MAP_FORMAT = 'HWE1.0'
+
+
 class Wolf3dMap:
 
     def __init__(self, name='New Map', width=64, height=64, num_planes=3):
@@ -17,7 +20,8 @@ class HavocMapReader:
         with open(file_path, 'rb') as file:
 
             # These first bytes are more to do with the reader than the map itself.
-            format = struct.unpack('<6s', file.read(6))[0]
+            format = struct.unpack('<6s', file.read(6))[0].decode()
+            assert format == HAVOC_MAP_FORMAT, f'Not a valid Havoc map format: {format}'
             unknown1 = struct.unpack('<H', file.read(2))[0]
             unknown2 = struct.unpack('<H', file.read(2))[0]
 
@@ -57,7 +61,7 @@ class HavocMapWriter:
         with open(file_path, 'wb') as file:
 
             # These first bytes are more to do with the reader than the map itself.
-            file.write(struct.pack('<6s', 'HWE1.0'.encode('ascii')))
+            file.write(struct.pack('<6s', HAVOC_MAP_FORMAT.encode('ascii')))
             file.write(struct.pack('<H', 1))
             file.write(struct.pack('<H', 0))
 
@@ -89,8 +93,18 @@ class HavocMapWriter:
 
 if __name__ == '__main__':
     m1 = HavocMapReader()(sys.argv[1])
-    HavocMapWriter()(m1, sys.argv[2])
-    m2 = HavocMapReader()(sys.argv[2])
+    # HavocMapWriter()(m1, sys.argv[2])
+    # m2 = HavocMapReader()(sys.argv[2])
+    #
+    # print('name:', m1.name, m2.name)
+    # print('tiles:', m1.tiles.shape, m2.tiles.shape)
 
-    print('name:', m1.name, m2.name)
-    print('tiles:', m1.tiles.shape, m2.tiles.shape)
+    m = Wolf3dMap('test', width=32, height=64)
+    # print(m.name)
+    # print(m.tiles)
+
+    for x in range(10):
+        for y in range(20):
+            m.tiles[x][y][0] = 1
+
+    HavocMapWriter()(m, sys.argv[2])
