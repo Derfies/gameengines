@@ -1,0 +1,3 @@
+- Ensure all dataclass field names match those of the docs.
+- Writer classes.
+- Convenience funtions for authoring maps using some geo lib?

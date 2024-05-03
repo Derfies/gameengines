@@ -1,6 +1,18 @@
 import abc
 import struct
 from dataclasses import dataclass
+from typing import BinaryIO
+
+
+@dataclass(slots=True)
+class Header:
+
+    version: int
+    posx: int
+    posy: int
+    posz: int
+    ang: int
+    cursectnum: int
 
 
 @dataclass(slots=True)
@@ -81,28 +93,22 @@ class Sprite:
     extra: int
 
 
-class MapBase(metaclass=abc.ABCMeta):
+class MapBase:#(metaclass=abc.ABCMeta):
 
-    def __init_subclass__(cls, **kwargs):
+    header_fmt = '<iiiihh'
+    header_cls = Header
+    sector_fmt = '<hhiihhhhbBBBhhbBBBBBhhh'
+    sector_cls = Sector
+    wall_fmt = '<iihhhhhbBhBBBBhhh'
+    wall_cls = Wall
+    sprite_fmt = '<iiihhbBBBBBbbhhhhhhhhhh'
+    sprite_cls = Sprite
 
-        # TODO: Turn into decorator.
-        missing = [
-            required
-            for required in (
-                'header_fmt',
-                'header_cls',
-                'sector_fmt',
-                'sector_cls',
-                'wall_fmt',
-                'wall_cls',
-                'sprite_fmt',
-                'sprite_cls',
-            )
-            if not hasattr(cls, required)
-        ]
-        if missing:
-            raise TypeError(f"Can't instantiate abstract class {cls.__name__} without {', '.join(missing)} attributes")
-        return super().__init_subclass__(**kwargs)
+    def __init__(self, header=None, sectors=None, walls=None, sprites=None, version=7):
+        self.header = header or self.header_cls(version, 0, 0, 0, 0, 0)
+        self.sectors = sectors or []
+        self.walls = walls or []
+        self.sprites = sprites or []
 
 
 class MapReaderBase(metaclass=abc.ABCMeta):
@@ -119,90 +125,70 @@ class MapReaderBase(metaclass=abc.ABCMeta):
 
     @property
     def sector_size(self):
-        raise
-        return struct.calcsize(self.map_cls.header_fmt)
+        return struct.calcsize(self.map_cls.sector_fmt)
 
     @property
     def wall_size(self):
-        raise
-        return struct.calcsize(self.map_cls.header_fmt)
+        return struct.calcsize(self.map_cls.wall_fmt)
 
     @property
     def sprite_size(self):
-        raise
-        return struct.calcsize(self.map_cls.header_fmt)
+        return struct.calcsize(self.map_cls.sprite_fmt)
 
     @property
     @abc.abstractmethod
     def map_cls(cls):
         ...
 
-    def __call__(self, file_path: str):
+    def __call__(self, file_path: str) -> MapBase:
         with open(file_path, 'rb') as file:
             header = self.get_header(file)
-            print('header:', header)
-            numsectors = self.get_numsectors(file)
-            sectors = self.get_sectors(file, numsectors)
-            numwalls = self.get_numwalls(file)
-            walls = self.get_walls(file, numwalls)
-            numsprites = self.get_numsprites(file)
-            sprites = self.get_sprites(file, numsprites)
+            numsectors = self.get_numsectors(file, header)
+            sectors = self.get_sectors(file, numsectors, header)
+            numwalls = self.get_numwalls(file, header)
+            walls = self.get_walls(file, numwalls, header)
+            numsprites = self.get_numsprites(file, header)
+            sprites = self.get_sprites(file, numsprites, header)
         return self.map_cls(header, sectors, walls, sprites)
 
-    def get_header(self, file):
+    @staticmethod
+    def decrypt(data: bytearray, key: int | None) -> bytearray:
+        return data
+
+    def get_header(self, file: BinaryIO) -> Header:
         data = file.read(struct.calcsize(self.map_cls.header_fmt))
         unpacked = struct.unpack(self.map_cls.header_fmt, data)
         return self.map_cls.header_cls(*unpacked)
 
-    def get_numsectors(self, file):
+    def get_numsectors(self, file: BinaryIO, header: Header) -> int:
         return struct.unpack('<H', file.read(2))[0]
 
-    def get_sectors(self, file, numsectors):
+    def get_sectors(self, file: BinaryIO, numsectors: int, header: Header, decrypt_key: int | None = None) -> list[Sector]:
         sectors = []
         for _ in range(numsectors):
-            data = file.read(self.sector_size)
-            unpacked = struct.unpack('<hhiihhhhbBBBhhbBBBBBhhh', data)
+            data = bytearray(file.read(self.sector_size))
+            unpacked = struct.unpack(self.map_cls.sector_fmt, self.decrypt(data, decrypt_key))
             sectors.append(Sector(*unpacked))
         return sectors
 
-    def get_numwalls(self, file):
+    def get_numwalls(self, file: BinaryIO, header: Header) -> int:
         return struct.unpack('<H', file.read(2))[0]
 
-    def get_walls(self, file, numwalls):
+    def get_walls(self, file: BinaryIO, numwalls: int, header: Header, decrypt_key: int | None = None) -> list[Wall]:
         walls = []
         for _ in range(numwalls):
-            data = file.read(self.wall_size)
-            unpacked = struct.unpack('<iihhhhhbBhBBBBhhh', data)
+            data = bytearray(file.read(self.wall_size))
+            unpacked = struct.unpack(self.map_cls.wall_fmt, self.decrypt(data, decrypt_key))
             walls.append(Wall(*unpacked))
         return walls
 
-    def get_numsprites(self, file):
+    def get_numsprites(self, file: BinaryIO, header: Header) -> int:
         return struct.unpack('<H', file.read(2))[0]
 
-    def get_sprites(self, file, numsprites):
+    def get_sprites(self, file: BinaryIO, numsprites: int, header: Header, decrypt_key: int | None = None) -> list[Sprite]:
         sprites = []
         for _ in range(numsprites):
-            data = file.read(self.sprite_size)
-            unpacked = struct.unpack('<iiihhbBBBBBbbhhhhhhhhhh', data)
+            data = bytearray(file.read(self.sprite_size))
+            unpacked = struct.unpack(self.map_cls.sprite_fmt, self.decrypt(data, decrypt_key))
             sprites.append(Sprite(*unpacked))
         return sprites
-
-
-if __name__ == '__main__':
-    class Foo(MapBase): pass
-    Foo()
-    #
-    # import time
-    #
-    # start = time.time()
-    # for i in range(1000):
-    #     m = Duke3dMapReader()(sys.argv[1])
-    #     foo = m.sectors[0].wallptr
-    #     m.sectors[0].wallptr = 0
-    # end = time.time()
-    # print('total', end - start)
-
-    # with open(r'/gameengines/build/tests/data\maps\blood_map.MAP', 'rb') as f:
-    #     data = f.read()
-    #
-    # print(data[:4])
