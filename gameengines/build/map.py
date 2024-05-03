@@ -1,18 +1,6 @@
 import abc
 import struct
-import sys
 from dataclasses import dataclass
-
-
-@dataclass(slots=True)
-class Header:
-
-    version: int
-    posx: int
-    posy: int
-    posz: int
-    ang: int
-    cursectnum: int
 
 
 @dataclass(slots=True)
@@ -95,42 +83,26 @@ class Sprite:
 
 class MapBase(metaclass=abc.ABCMeta):
 
-    @property
-    @abc.abstractmethod
-    def header_cls(cls):
-        """"""
+    def __init_subclass__(cls, **kwargs):
 
-    @property
-    @abc.abstractmethod
-    def sector_cls(cls):
-        """"""
-
-    @property
-    @abc.abstractmethod
-    def wall_cls(cls):
-        """"""
-
-    @property
-    @abc.abstractmethod
-    def sprite_cls(cls):
-        """"""
-
-
-class Duke3dMap(MapBase):
-
-    header_cls = Header
-    sector_cls = Sector
-    wall_cls = Wall
-    sprite_cls = Sprite
-
-    def __init__(self, header=None, sectors=None, walls=None, sprites=None):
-
-        # TODO: This is probably a base class concern? All build maps have this
-        # I assume.
-        self.header = header or self.header_cls(7, 0, 0, 0, 0, 0)
-        self.sectors = sectors or []
-        self.walls = walls or []
-        self.sprites = sprites or []
+        # TODO: Turn into decorator.
+        missing = [
+            required
+            for required in (
+                'header_fmt',
+                'header_cls',
+                'sector_fmt',
+                'sector_cls',
+                'wall_fmt',
+                'wall_cls',
+                'sprite_fmt',
+                'sprite_cls',
+            )
+            if not hasattr(cls, required)
+        ]
+        if missing:
+            raise TypeError(f"Can't instantiate abstract class {cls.__name__} without {', '.join(missing)} attributes")
+        return super().__init_subclass__(**kwargs)
 
 
 class MapReaderBase(metaclass=abc.ABCMeta):
@@ -142,33 +114,33 @@ class MapReaderBase(metaclass=abc.ABCMeta):
     """
 
     @property
-    @abc.abstractmethod
-    def header_size(cls):
-        """"""
+    def header_size(self):
+        return struct.calcsize(self.map_cls.header_fmt)
 
     @property
-    @abc.abstractmethod
-    def sector_size(cls):
-        """"""
+    def sector_size(self):
+        raise
+        return struct.calcsize(self.map_cls.header_fmt)
 
     @property
-    @abc.abstractmethod
-    def wall_size(cls):
-        """"""
+    def wall_size(self):
+        raise
+        return struct.calcsize(self.map_cls.header_fmt)
 
     @property
-    @abc.abstractmethod
-    def sprite_size(cls):
-        """"""
+    def sprite_size(self):
+        raise
+        return struct.calcsize(self.map_cls.header_fmt)
 
     @property
     @abc.abstractmethod
     def map_cls(cls):
-        """"""
+        ...
 
     def __call__(self, file_path: str):
         with open(file_path, 'rb') as file:
             header = self.get_header(file)
+            print('header:', header)
             numsectors = self.get_numsectors(file)
             sectors = self.get_sectors(file, numsectors)
             numwalls = self.get_numwalls(file)
@@ -178,9 +150,9 @@ class MapReaderBase(metaclass=abc.ABCMeta):
         return self.map_cls(header, sectors, walls, sprites)
 
     def get_header(self, file):
-        data = file.read(self.header_size)
-        unpacked = struct.unpack('<iiiihh', data)
-        return Header(*unpacked)
+        data = file.read(struct.calcsize(self.map_cls.header_fmt))
+        unpacked = struct.unpack(self.map_cls.header_fmt, data)
+        return self.map_cls.header_cls(*unpacked)
 
     def get_numsectors(self, file):
         return struct.unpack('<H', file.read(2))[0]
@@ -216,23 +188,21 @@ class MapReaderBase(metaclass=abc.ABCMeta):
         return sprites
 
 
-class Duke3dMapReader(MapReaderBase):
-
-    map_cls = Duke3dMap
-    header_size = 20
-    sector_size = 40
-    wall_size = 32
-    sprite_size = 44
-
-
 if __name__ == '__main__':
+    class Foo(MapBase): pass
+    Foo()
+    #
+    # import time
+    #
+    # start = time.time()
+    # for i in range(1000):
+    #     m = Duke3dMapReader()(sys.argv[1])
+    #     foo = m.sectors[0].wallptr
+    #     m.sectors[0].wallptr = 0
+    # end = time.time()
+    # print('total', end - start)
 
-    import time
-
-    start = time.time()
-    for i in range(1000):
-        m = Duke3dMapReader()(sys.argv[1])
-        foo = m.sectors[0].wallptr
-        m.sectors[0].wallptr = 0
-    end = time.time()
-    print('total', end - start)
+    # with open(r'/gameengines/build/tests/data\maps\blood_map.MAP', 'rb') as f:
+    #     data = f.read()
+    #
+    # print(data[:4])
