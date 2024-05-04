@@ -18,29 +18,29 @@ class Header:
 @dataclass
 class Sector:
 
-    wallptr: int
-    wallnum: int
-    ceilingz: int
-    floorz: int
-    ceilingstat: int
-    floorstat: int
-    ceilingpicnum: int
-    ceilingheinum: int
-    ceilingshade: int
-    ceilingpal: int
-    ceilingxpanning: int
-    ceilingypanning: int
-    floorpicnum: int
-    floorheinum: int
-    floorshade: int
-    floorpal: int
-    floorxpanning: int
-    floorypanning: int
-    visibility: int
-    filler: int
-    lotag: int
-    hitag: int
-    extra: int
+    wallptr: int = 0
+    wallnum: int = 0
+    ceilingz: int = 0
+    floorz: int = 0
+    ceilingstat: int = 0
+    floorstat: int = 0
+    ceilingpicnum: int = 0
+    ceilingheinum: int = 0
+    ceilingshade: int = 0
+    ceilingpal: int = 0
+    ceilingxpanning: int = 0
+    ceilingypanning: int = 0
+    floorpicnum: int = 0
+    floorheinum: int = 0
+    floorshade: int = 0
+    floorpal: int = 0
+    floorxpanning: int = 0
+    floorypanning: int = 0
+    visibility: int = 0
+    filler: int = 0
+    lotag: int = 0
+    hitag: int = 0
+    extra: int = -1
 
     def __post_init__(self, *args, **kwargs):
         self.extra_data = None
@@ -49,23 +49,23 @@ class Sector:
 @dataclass
 class Wall:
 
-    x: int
-    y: int
-    point2: int
-    nextwall: int
-    nextsector: int
-    cstat: int
-    picnum: int
-    overpicnum: int
-    shade: int
-    pal: int
-    xrepeat: int
-    yrepeat: int
-    xpanning: int
-    ypanning: int
-    lotag: int
-    hitag: int
-    extra: int
+    x: int = 0
+    y: int = 0
+    point2: int = 0
+    nextwall: int = -1
+    nextsector: int = -1
+    cstat: int = 0
+    picnum: int = 0
+    overpicnum: int = 0
+    shade: int = 0
+    pal: int = 0
+    xrepeat: int = 0
+    yrepeat: int = 0
+    xpanning: int = 0
+    ypanning: int = 0
+    lotag: int = 0
+    hitag: int = 0
+    extra: int = -1
 
     def __post_init__(self):
         self.extra_data = None
@@ -74,29 +74,29 @@ class Wall:
 @dataclass
 class Sprite:
 
-    x: int
-    y: int
-    z: int
-    cstat: int
-    picnum: int
-    shade: int
-    pal: int
-    clipdist: int
-    filler: int
-    xrepeat: int
-    yrepeat: int
-    xoffset: int
-    yoffset: int
-    sectnum: int
-    statnum: int
-    ang: int
-    owner: int
-    xvel: int
-    yvel: int
-    zvel: int
-    lotag: int
-    hitag: int
-    extra: int
+    x: int = 0
+    y: int = 0
+    z: int = 0
+    cstat: int = 0
+    picnum: int = 0
+    shade: int = 0
+    pal: int = 0
+    clipdist: int = 0
+    filler: int = 0
+    xrepeat: int = 0
+    yrepeat: int = 0
+    xoffset: int = 0
+    yoffset: int = 0
+    sectnum: int = 0
+    statnum: int = 0
+    ang: int = 0
+    owner: int = 0
+    xvel: int = 0
+    yvel: int = 0
+    zvel: int = 0
+    lotag: int = 0
+    hitag: int = 0
+    extra: int = -1
 
     def __post_init__(self):
         self.extra_data = None

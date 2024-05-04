@@ -4,7 +4,6 @@ from pathlib import Path
 
 from gameengines.build.blood import MapReader as BloodMapReader, MapWriter as BloodMapWriter
 from gameengines.build.duke3d import MapReader as Duke3dMapReader, MapWriter as Duke3dMapWriter
-from gameengines.build.map import MapWriterBase
 
 
 class TestMapReaders(unittest.TestCase):
@@ -20,10 +19,6 @@ class TestMapReaders(unittest.TestCase):
         self.assertEqual(1, m.header.numsprites)
         self.assertEqual(1, len(m.sprites))
 
-        print('Blood')
-        for sprite in m.sprites:
-            print(sprite)
-
     def test_duke3d_read(self):
         file_path = Path(__file__).parent.joinpath(r'data\duke3d.map')
         with open(file_path, 'rb') as file:
@@ -32,10 +27,6 @@ class TestMapReaders(unittest.TestCase):
         self.assertEqual(4, len(m.walls))
         self.assertEqual(0, len(m.sprites))
 
-        print('Duke3d')
-        for sprite in m.sprites:
-            print(sprite)
-
     def test_blood_round_trip(self):
         file_path = Path(__file__).parent.joinpath(r'data\blood.map')
         with open(file_path, 'rb') as file:
@@ -43,9 +34,7 @@ class TestMapReaders(unittest.TestCase):
             m = BloodMapReader()(input)
         output = io.BytesIO()
         BloodMapWriter()(m, output)
-        input.seek(0)
-        output.seek(0)
-        self.assertEqual(input.read(), output.read())
+        self.assertEqual(input.getbuffer(), output.getbuffer())
 
     def test_duke3d_round_trip(self):
         file_path = Path(__file__).parent.joinpath(r'data\duke3d.map')
@@ -54,6 +43,4 @@ class TestMapReaders(unittest.TestCase):
             m = Duke3dMapReader()(input)
         output = io.BytesIO()
         Duke3dMapWriter()(m, output)
-        input.seek(0)
-        output.seek(0)
-        self.assertEqual(input.read(), output.read())
+        self.assertEqual(input.getbuffer(), output.getbuffer())

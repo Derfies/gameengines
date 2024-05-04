@@ -60,10 +60,6 @@ class MapReader(MapReaderBase):
 
         """
         if key is not None:
-            # key = key & 0xFF
-            # for i in range(len(data)):
-            #     data[i] ^= key
-            #     key += 1
             data = bytearray(data)
             for index in range(len(data)):
                 data[index] ^= (key + index) & 0xFF
