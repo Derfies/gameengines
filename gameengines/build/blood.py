@@ -3,7 +3,7 @@ import struct
 from dataclasses import asdict, dataclass
 from typing import BinaryIO
 
-from gameengines.build.map import MapBase, MapReaderBase, MapWriterBase, Sector, Sprite as SpriteBase, Wall
+from gameengines.build.map import MapBase, MapReaderBase, MapWriterBase, Sector, Sprite, Wall
 
 
 MASTER_CRYPT_KEY = 0x7474614d
@@ -12,39 +12,29 @@ MASTER_CRYPT_KEY = 0x7474614d
 @dataclass(slots=True)
 class Header:
 
-    signature: str
-    version: int
-    posx: int
-    posy: int
-    posz: int
-    ang: int
-    cursectnum: int
-    skybits: int
-    visibility: int
-    songid: int
-    parallaxtype: int
-    revision: int
-    numsectors: int
-    numwalls: int
-    numsprites: int
+    signature: bytes = b'BLM\x1a'
+    version: int = 7
+    posx: int = 0
+    posy: int = 0
+    posz: int = 0
+    ang: int = 0
+    cursectnum: int = 0
+    skybits: int = 0
+    visibility: int = 0
+    songid: int = 0
+    parallaxtype: bytes = b'\x02'
+    revision: int = 0
+    numsectors: int = 0
+    numwalls: int = 0
+    numsprites: int = 0
 
     # HAXXOR
     # Not sure what to do with this yet.
-    pre_padding: bytes = None
-    x_sprite_size: int = None
-    x_wall_size: int = None
-    x_sector_size: int = None
-    post_padding: bytes = None
-
-
-class Sprite(SpriteBase):
-
-    # TODO: Make this the base class.
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.extra_data = None
+    pre_padding: bytes = b'Copyright 1997 Monolith Productions.  All Rights Reserved\x00\x00\x00\x00\x00\x00\x00'
+    x_sprite_size: int = 56
+    x_wall_size: int = 24
+    x_sector_size: int = 60
+    post_padding: bytes = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x86\x86'
 
 
 class Map(MapBase):
@@ -52,9 +42,6 @@ class Map(MapBase):
     pre_header_fmt = '<4sh'
     header_fmt = '<iiihhhiiciHHH'
     header_cls = Header
-    sprite_cls = Sprite
-
-
 
 
 class MapReader(MapReaderBase):
@@ -73,10 +60,14 @@ class MapReader(MapReaderBase):
 
         """
         if key is not None:
-            key = key & 0xFF
-            for i in range(len(data)):
-                data[i] ^= key
-                key += 1
+            # key = key & 0xFF
+            # for i in range(len(data)):
+            #     data[i] ^= key
+            #     key += 1
+            data = bytearray(data)
+            for index in range(len(data)):
+                data[index] ^= (key + index) & 0xFF
+            return bytes(data)
         return data
 
     @property
@@ -116,12 +107,6 @@ class MapReader(MapReaderBase):
     def get_num_sprites(self, file: BinaryIO, header: Header) -> int:
         return header.numsprites
 
-    def get_sprite(self, file: BinaryIO, header: Header, decrypt_key: int | None = None):
-        sprite = super().get_sprite(file, header, decrypt_key)
-        if sprite.extra > 0:
-            sprite.extra_data = file.read(header.x_sprite_size)
-        return sprite
-
     def get_sprites(self, file: BinaryIO, num_sprites: int, header: Header, decrypt_key: int | None = None) -> list[Sprite]:
         return super().get_sprites(file, num_sprites, header, decrypt_key=header.revision * self.sprite_size | MASTER_CRYPT_KEY)
 
@@ -132,22 +117,28 @@ class MapWriter(MapWriterBase):
 
     def __call__(self, m: MapBase, file: BinaryIO):
         super().__call__(m, file)
-        self.write_footer(m, file)
+        self.write_crc(m, file)
 
     @staticmethod
-    def encrypt(data: bytearray, key: int | None) -> bytearray:
+    def encrypt(data: bytes, key: int | None) -> bytes:
         """
         https://moddingwiki.shikadi.net/wiki/RFF_Format#:~:text=The%20RFF%20format%20is%20used,avoid%20extraction%20by%20ripping%20utilities.
 
         """
         if key is not None:
-            key = key & 0xFF
-            for i in range(len(data)):
-                data[i] ^= key
-                key += 1
+            data = bytearray(data)
+            for index in range(len(data)):
+                data[index] ^= (key + index) & 0xFF
+            return bytes(data)
         return data
 
     def write_header(self, m: MapBase, file: BinaryIO, encrypt_key: int | None = None):
+
+        # HAXXOR
+        # Need to set the head numbers.
+        m.header.numsectors = len(m.sectors)
+        m.header.numwalls = len(m.walls)
+        m.header.numsprites = len(m.sprites)
 
         data = list(asdict(m.header).values())
 
@@ -156,7 +147,7 @@ class MapWriter(MapWriterBase):
         packed = bytearray(struct.pack(self.map_cls.pre_header_fmt, signature, version))
         file.write(packed)
 
-
+        # TODO: This isn't currently picking up new num_ values.
         packed = bytearray(struct.pack(self.map_cls.header_fmt, *data[2:-5]))
         file.write(self.encrypt(packed, MASTER_CRYPT_KEY))
 
@@ -167,9 +158,9 @@ class MapWriter(MapWriterBase):
         foo.extend(sizes)
         foo.extend(m.header.post_padding)
 
-        self.encrypt(foo, m.header.numwalls)
 
-        file.write(foo)
+
+        file.write(self.encrypt(foo, m.header.numwalls))
 
     def write_num_sectors(self, m: MapBase, file: BinaryIO):
         pass
@@ -189,12 +180,6 @@ class MapWriter(MapWriterBase):
     def write_sprites(self, m: MapBase, file: BinaryIO, encrypt_key: int | None = None):
         super().write_sprites(m, file, encrypt_key=m.header.revision * self.sprite_size | MASTER_CRYPT_KEY)
 
-    def write_footer(self, m: MapBase, file: BinaryIO):
-        position = file.tell()
-        file.seek(0)
-        data = file.read()
-        file.seek(position)
-        crc = binascii.crc32(data)
-        #self.hash = struct.pack('<I', crc)
-        #self.data.extend(self.hash)
+    def write_crc(self, m: MapBase, file: BinaryIO):
+        crc = binascii.crc32(file.getbuffer())
         file.write(struct.pack('<I', crc))
