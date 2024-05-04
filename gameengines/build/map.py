@@ -246,25 +246,34 @@ class MapWriterBase(metaclass=abc.ABCMeta):
         data = len(m.sectors)
         file.write(struct.pack('<H', data))
 
-    def write_sectors(self, m: MapBase, file: BinaryIO):
+    def write_sectors(self, m: MapBase, file: BinaryIO, encrypt_key: int | None = None):
         for sector in m.sectors:
             data = asdict(sector).values()
-            file.write(struct.pack(self.map_cls.sector_fmt, *data))
+            packed = bytearray(struct.pack(self.map_cls.sector_fmt, *data))
+            file.write(self.encrypt(packed, encrypt_key))
+
+        print('after write sectors:', file.tell())
 
     def write_num_walls(self, m: MapBase, file: BinaryIO):
         data = len(m.walls)
         file.write(struct.pack('<H', data))
 
-    def write_walls(self, m: MapBase, file: BinaryIO):
+    def write_walls(self, m: MapBase, file: BinaryIO, encrypt_key: int | None = None):
         for wall in m.walls:
             data = asdict(wall).values()
-            file.write(struct.pack(self.map_cls.wall_fmt, *data))
+            packed = bytearray(struct.pack(self.map_cls.wall_fmt, *data))
+            file.write(self.encrypt(packed, encrypt_key))
+
+        print('after write walls:', file.tell())
 
     def write_num_sprites(self, m: MapBase, file: BinaryIO):
         data = len(m.sprites)
         file.write(struct.pack('<H', data))
 
-    def write_sprites(self, m: MapBase, file: BinaryIO):
+    def write_sprites(self, m: MapBase, file: BinaryIO, encrypt_key: int | None = None):
         for sprite in m.sprites:
             data = asdict(sprite).values()
-            file.write(struct.pack(self.map_cls.sprite_fmt, *data))
+            packed = bytearray(struct.pack(self.map_cls.sprite_fmt, *data))
+            file.write(self.encrypt(packed, encrypt_key))
+
+        print('after write sprites:', file.tell())

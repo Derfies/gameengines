@@ -27,6 +27,14 @@ class Header:
     numwalls: int
     numsprites: int
 
+    # HAXXOR
+    # Not sure what to do with this yet.
+    pre_padding: bytes = None
+    x_sprite_size: int = None
+    x_wall_size: int = None
+    x_sector_size: int = None
+    post_padding: bytes = None
+
 
 class Map(MapBase):
 
@@ -45,15 +53,16 @@ class MapReader(MapReaderBase):
     map_cls = Map
 
     @staticmethod
-    def decrypt(data: bytearray, key: int) -> bytearray:
+    def decrypt(data: bytearray, key: int | None) -> bytearray:
         """
         https://moddingwiki.shikadi.net/wiki/RFF_Format#:~:text=The%20RFF%20format%20is%20used,avoid%20extraction%20by%20ripping%20utilities.
 
         """
-        key = key & 0xFF
-        for i in range(len(data)):
-            data[i] ^= key
-            key += 1
+        if key is not None:
+            key = key & 0xFF
+            for i in range(len(data)):
+                data[i] ^= key
+                key += 1
         return data
 
     @property
@@ -67,10 +76,17 @@ class MapReader(MapReaderBase):
         data = bytearray(file.read(self.header_size))
         unpacked = struct.unpack(self.map_cls.header_fmt, self.decrypt(data, MASTER_CRYPT_KEY))
 
-        # TODO: Parse remaining data.
-        file.seek(173)
+        header = self.map_cls.header_cls(signature, version, *unpacked)
 
-        return self.map_cls.header_cls(signature, version, *unpacked)
+
+        data = bytearray(file.read(128))
+        header.x_sprite_size, header.x_wall_size, header.x_sector_size = struct.unpack('<iii', self.decrypt(data, header.numwalls)[64:76])
+
+        # TODO: Parse remaining data.
+        header.pre_padding = bytearray(data[:63])   # Copyright
+        header.post_padding = bytearray(data[76:])  # Null bytes
+
+        return header#self.map_cls.header_cls(signature, version, *unpacked, padding)
 
     def get_num_sectors(self, file: BinaryIO, header: Header) -> int:
         return header.numsectors
@@ -95,21 +111,59 @@ class MapWriter(MapWriterBase):
 
     map_cls = Map
 
+    @staticmethod
+    def encrypt(data: bytearray, key: int | None) -> bytearray:
+        """
+        https://moddingwiki.shikadi.net/wiki/RFF_Format#:~:text=The%20RFF%20format%20is%20used,avoid%20extraction%20by%20ripping%20utilities.
+
+        """
+        if key is not None:
+            key = key & 0xFF
+            for i in range(len(data)):
+                data[i] ^= key
+                key += 1
+        return data
+
     def write_header(self, m: MapBase, file: BinaryIO, encrypt_key: int | None = None):
+        print(m.header)
+        print(asdict(m.header))
         data = list(asdict(m.header).values())
+        for i, val in enumerate(data):
+            print(i, '->', val)
         signature, version = data[:2]
         version <<= 8
         packed = bytearray(struct.pack(self.map_cls.pre_header_fmt, signature, version))
         file.write(packed)
-        data = data[:-3] + [m.header.numsectors, m.header.numwalls, m.header.numsprites]
-        packed = bytearray(struct.pack(self.map_cls.header_fmt, *data[2:]))
+
+        print(data[2:-5])
+        packed = bytearray(struct.pack(self.map_cls.header_fmt, *data[2:-5]))
         file.write(self.encrypt(packed, MASTER_CRYPT_KEY))
+
+        # TODO: Sort this out.
+        foo = data[-5:]
+        encypted_foo = self.encrypt(packed, MASTER_CRYPT_KEY)
+        print(data[-5])
+        print(data[-4:-1])
+        file.write(data[-5])
+        packed = bytearray(struct.pack('<iii', *data[-4:-1]))
+        file.write(self.encrypt(packed, MASTER_CRYPT_KEY))
+        print(data[-1])
+        file.write(data[-1])
 
     def write_num_sectors(self, m: MapBase, file: BinaryIO):
         pass
 
+    def write_sectors(self, m: MapBase, file: BinaryIO, encrypt_key: int | None = None):
+        super().write_sectors(m, file, encrypt_key=m.header.revision * self.sector_size)
+
     def write_num_walls(self, m: MapBase, file: BinaryIO):
         pass
 
+    def write_walls(self, m: MapBase, file: BinaryIO, encrypt_key: int | None = None):
+        super().write_walls(m, file, encrypt_key=m.header.revision * self.sector_size | MASTER_CRYPT_KEY)
+
     def write_num_sprites(self, m: MapBase, file: BinaryIO):
         pass
+
+    def write_sprites(self, m: MapBase, file: BinaryIO, encrypt_key: int | None = None):
+        super().write_sprites(m, file, encrypt_key=m.header.revision * self.sprite_size | MASTER_CRYPT_KEY)
