@@ -1,8 +1,9 @@
+import binascii
 import struct
 from dataclasses import asdict, dataclass
 from typing import BinaryIO
 
-from gameengines.build.map import MapBase, MapReaderBase, MapWriterBase, Sector, Sprite, Wall
+from gameengines.build.map import MapBase, MapReaderBase, MapWriterBase, Sector, Sprite as SpriteBase, Wall
 
 
 MASTER_CRYPT_KEY = 0x7474614d
@@ -36,11 +37,24 @@ class Header:
     post_padding: bytes = None
 
 
+class Sprite(SpriteBase):
+
+    # TODO: Make this the base class.
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.extra_data = None
+
+
 class Map(MapBase):
 
     pre_header_fmt = '<4sh'
     header_fmt = '<iiihhhiiciHHH'
     header_cls = Header
+    sprite_cls = Sprite
+
+
 
 
 class MapReader(MapReaderBase):
@@ -79,14 +93,13 @@ class MapReader(MapReaderBase):
         header = self.map_cls.header_cls(signature, version, *unpacked)
 
 
-        data = bytearray(file.read(128))
-        header.x_sprite_size, header.x_wall_size, header.x_sector_size = struct.unpack('<iii', self.decrypt(data, header.numwalls)[64:76])
+        data = self.decrypt(bytearray(file.read(130)), header.numwalls)
+        header.x_sprite_size, header.x_wall_size, header.x_sector_size = struct.unpack('<iii', data[64:76])
 
         # TODO: Parse remaining data.
-        header.pre_padding = bytearray(data[:63])   # Copyright
+        header.pre_padding = bytearray(data[:64])   # Copyright
         header.post_padding = bytearray(data[76:])  # Null bytes
-
-        return header#self.map_cls.header_cls(signature, version, *unpacked, padding)
+        return header
 
     def get_num_sectors(self, file: BinaryIO, header: Header) -> int:
         return header.numsectors
@@ -103,6 +116,12 @@ class MapReader(MapReaderBase):
     def get_num_sprites(self, file: BinaryIO, header: Header) -> int:
         return header.numsprites
 
+    def get_sprite(self, file: BinaryIO, header: Header, decrypt_key: int | None = None):
+        sprite = super().get_sprite(file, header, decrypt_key)
+        if sprite.extra > 0:
+            sprite.extra_data = file.read(header.x_sprite_size)
+        return sprite
+
     def get_sprites(self, file: BinaryIO, num_sprites: int, header: Header, decrypt_key: int | None = None) -> list[Sprite]:
         return super().get_sprites(file, num_sprites, header, decrypt_key=header.revision * self.sprite_size | MASTER_CRYPT_KEY)
 
@@ -110,6 +129,10 @@ class MapReader(MapReaderBase):
 class MapWriter(MapWriterBase):
 
     map_cls = Map
+
+    def __call__(self, m: MapBase, file: BinaryIO):
+        super().__call__(m, file)
+        self.write_footer(m, file)
 
     @staticmethod
     def encrypt(data: bytearray, key: int | None) -> bytearray:
@@ -125,30 +148,28 @@ class MapWriter(MapWriterBase):
         return data
 
     def write_header(self, m: MapBase, file: BinaryIO, encrypt_key: int | None = None):
-        print(m.header)
-        print(asdict(m.header))
+
         data = list(asdict(m.header).values())
-        for i, val in enumerate(data):
-            print(i, '->', val)
+
         signature, version = data[:2]
         version <<= 8
         packed = bytearray(struct.pack(self.map_cls.pre_header_fmt, signature, version))
         file.write(packed)
 
-        print(data[2:-5])
+
         packed = bytearray(struct.pack(self.map_cls.header_fmt, *data[2:-5]))
         file.write(self.encrypt(packed, MASTER_CRYPT_KEY))
 
-        # TODO: Sort this out.
-        foo = data[-5:]
-        encypted_foo = self.encrypt(packed, MASTER_CRYPT_KEY)
-        print(data[-5])
-        print(data[-4:-1])
-        file.write(data[-5])
-        packed = bytearray(struct.pack('<iii', *data[-4:-1]))
-        file.write(self.encrypt(packed, MASTER_CRYPT_KEY))
-        print(data[-1])
-        file.write(data[-1])
+
+        foo = bytearray()
+        foo.extend(m.header.pre_padding)
+        sizes = struct.pack('<iii', m.header.x_sprite_size, m.header.x_wall_size, m.header.x_sector_size)
+        foo.extend(sizes)
+        foo.extend(m.header.post_padding)
+
+        self.encrypt(foo, m.header.numwalls)
+
+        file.write(foo)
 
     def write_num_sectors(self, m: MapBase, file: BinaryIO):
         pass
@@ -167,3 +188,13 @@ class MapWriter(MapWriterBase):
 
     def write_sprites(self, m: MapBase, file: BinaryIO, encrypt_key: int | None = None):
         super().write_sprites(m, file, encrypt_key=m.header.revision * self.sprite_size | MASTER_CRYPT_KEY)
+
+    def write_footer(self, m: MapBase, file: BinaryIO):
+        position = file.tell()
+        file.seek(0)
+        data = file.read()
+        file.seek(position)
+        crc = binascii.crc32(data)
+        #self.hash = struct.pack('<I', crc)
+        #self.data.extend(self.hash)
+        file.write(struct.pack('<I', crc))

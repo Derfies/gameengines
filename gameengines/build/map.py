@@ -143,6 +143,8 @@ class MapReaderBase(metaclass=abc.ABCMeta):
     def __call__(self, file: BinaryIO) -> MapBase:
 
         # TODO: Convert all file vars to 'stream'
+        # TODO: Maybe 'num_something' is actually a member on this class...
+        # Would solve a slight artchitecture smell...
         header = self.get_header(file)
         num_sectors = self.get_num_sectors(file, header)
         sectors = self.get_sectors(file, num_sectors, header)
@@ -164,13 +166,18 @@ class MapReaderBase(metaclass=abc.ABCMeta):
     def get_num_sectors(self, file: BinaryIO, header: Header) -> int:
         return struct.unpack('<H', file.read(2))[0]
 
+    def get_sector(self, file: BinaryIO, decrypt_key: int | None = None):
+        data = bytearray(file.read(self.sector_size))
+        unpacked = struct.unpack(self.map_cls.sector_fmt, self.decrypt(data, decrypt_key))
+        return self.map_cls.sector_cls(*unpacked)
+
     def get_sectors(self, file: BinaryIO, num_sectors: int, header: Header, decrypt_key: int | None = None) -> list[Sector]:
-        sectors = []
-        for _ in range(num_sectors):
-            data = bytearray(file.read(self.sector_size))
-            unpacked = struct.unpack(self.map_cls.sector_fmt, self.decrypt(data, decrypt_key))
-            sectors.append(Sector(*unpacked))
-        return sectors
+        # sectors = []
+        # for _ in range(num_sectors):
+        #     sector = self.get_sector(file, decrypt_key=decrypt_key)
+        #     sectors.append(sector)
+        # return sectors
+        return [self.get_sector(file, decrypt_key=decrypt_key) for _ in range(num_sectors)]
 
     def get_num_walls(self, file: BinaryIO, header: Header) -> int:
         return struct.unpack('<H', file.read(2))[0]
@@ -186,13 +193,19 @@ class MapReaderBase(metaclass=abc.ABCMeta):
     def get_num_sprites(self, file: BinaryIO, header: Header) -> int:
         return struct.unpack('<H', file.read(2))[0]
 
+    def get_sprite(self, file: BinaryIO, header: Header, decrypt_key: int | None = None):
+        data = bytearray(file.read(self.sprite_size))
+        unpacked = struct.unpack(self.map_cls.sprite_fmt, self.decrypt(data, decrypt_key))
+        return self.map_cls.sprite_cls(*unpacked)
+
     def get_sprites(self, file: BinaryIO, num_sprites: int, header: Header, decrypt_key: int | None = None) -> list[Sprite]:
-        sprites = []
-        for _ in range(num_sprites):
-            data = bytearray(file.read(self.sprite_size))
-            unpacked = struct.unpack(self.map_cls.sprite_fmt, self.decrypt(data, decrypt_key))
-            sprites.append(Sprite(*unpacked))
-        return sprites
+        # sprites = []
+        # for _ in range(num_sprites):
+        #
+        #
+        #     sprites.append(Sprite(*unpacked))
+        # return sprites
+        return [self.get_sprite(file, header, decrypt_key=decrypt_key) for _ in range(num_sprites)]
 
 
 class MapWriterBase(metaclass=abc.ABCMeta):
@@ -250,7 +263,9 @@ class MapWriterBase(metaclass=abc.ABCMeta):
         for sector in m.sectors:
             data = asdict(sector).values()
             packed = bytearray(struct.pack(self.map_cls.sector_fmt, *data))
-            file.write(self.encrypt(packed, encrypt_key))
+            e = self.encrypt(packed, encrypt_key)
+            print('raw sector data:', e)
+            file.write(e)
 
         print('after write sectors:', file.tell())
 
@@ -262,7 +277,9 @@ class MapWriterBase(metaclass=abc.ABCMeta):
         for wall in m.walls:
             data = asdict(wall).values()
             packed = bytearray(struct.pack(self.map_cls.wall_fmt, *data))
-            file.write(self.encrypt(packed, encrypt_key))
+            e = self.encrypt(packed, encrypt_key)
+            print('raw wall data:', e)
+            file.write(e)
 
         print('after write walls:', file.tell())
 
@@ -270,10 +287,21 @@ class MapWriterBase(metaclass=abc.ABCMeta):
         data = len(m.sprites)
         file.write(struct.pack('<H', data))
 
+    def write_sprite(self, sprite: Sprite, file: BinaryIO, encrypt_key: int | None = None):
+
+        # TODO: Don't need to tease this function out from below.
+        data = asdict(sprite).values()
+        packed = bytearray(struct.pack(self.map_cls.sprite_fmt, *data))
+        e = self.encrypt(packed, encrypt_key)
+        #print('raw sprite data:', e)
+        file.write(e)
+
+        # HAX
+        if sprite.extra > 0:
+            file.write(sprite.extra_data)
+
     def write_sprites(self, m: MapBase, file: BinaryIO, encrypt_key: int | None = None):
         for sprite in m.sprites:
-            data = asdict(sprite).values()
-            packed = bytearray(struct.pack(self.map_cls.sprite_fmt, *data))
-            file.write(self.encrypt(packed, encrypt_key))
+            self.write_sprite(sprite, file, encrypt_key=encrypt_key)
 
         print('after write sprites:', file.tell())
