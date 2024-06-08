@@ -8,7 +8,8 @@ from gameengines.build.map import Sector, Sprite, Wall, MapWriterBase, MapBase
 map_cls = Map
 
 
-DEFAULT_MAP_SIZE = 2048
+METER = 514
+DEFAULT_MAP_SIZE = 4 * METER
 
 
 m = map_cls()
