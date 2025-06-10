@@ -1,6 +1,6 @@
 import abc
 import struct
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass
 from typing import BinaryIO
 
 
@@ -51,7 +51,7 @@ class Wall:
 
     x: int = 0
     y: int = 0
-    point2: int = 0
+    point2: int = -1
     nextwall: int = -1
     nextsector: int = -1
     cstat: int = 0
@@ -102,7 +102,7 @@ class Sprite:
         self.extra_data = None
 
 
-class MapBase:
+class Map:
 
     header_fmt = '<iiiihh'
     header_cls = Header
@@ -119,15 +119,15 @@ class MapBase:
         self.walls = walls or []
         self.sprites = sprites or []
 
-    @classmethod
-    def from_map(cls, m: 'MapBase'):
-        new_header_field_names = [f.name for f in fields(cls.header_cls)]
-        new_header_data = {key: value for key, value in asdict(m.header).items() if key in new_header_field_names}
-        header = cls.header_cls(**new_header_data)
-        sectors = [cls.sector_cls(**asdict(sector)) for sector in m.sectors]
-        walls = [cls.wall_cls(**asdict(sector)) for sector in m.walls]
-        sprites = [cls.sprite_cls(**asdict(sector)) for sector in m.sprites]
-        return cls(header, sectors, walls, sprites)
+    # @classmethod
+    # def from_map(cls, m: 'MapBase'):
+    #     new_header_field_names = [f.name for f in fields(cls.header_cls)]
+    #     new_header_data = {key: value for key, value in asdict(m.header).items() if key in new_header_field_names}
+    #     header = cls.header_cls(**new_header_data)
+    #     sectors = [cls.sector_cls(**asdict(sector)) for sector in m.sectors]
+    #     walls = [cls.wall_cls(**asdict(sector)) for sector in m.walls]
+    #     sprites = [cls.sprite_cls(**asdict(sector)) for sector in m.sprites]
+    #     return cls(header, sectors, walls, sprites)
 
 
 class MapReaderBase(metaclass=abc.ABCMeta):
@@ -159,7 +159,7 @@ class MapReaderBase(metaclass=abc.ABCMeta):
     def map_cls(cls):
         ...
 
-    def __call__(self, file: BinaryIO) -> MapBase:
+    def __call__(self, file: BinaryIO) -> Map:
 
         # TODO: Convert all file vars to 'stream'
         # TODO: Maybe 'num_something' is actually a member on this class...
@@ -248,7 +248,7 @@ class MapWriterBase(metaclass=abc.ABCMeta):
     def map_cls(cls):
         ...
 
-    def __call__(self, m: MapBase, file: BinaryIO):
+    def __call__(self, m: Map, file: BinaryIO):
         self.write_header(m, file)
         self.write_num_sectors(m, file)
         self.write_sectors(m, file)
@@ -261,16 +261,16 @@ class MapWriterBase(metaclass=abc.ABCMeta):
     def encrypt(data: bytes, key: int | None) -> bytes:
         return data
 
-    def write_header(self, m: MapBase, file: BinaryIO, encrypt_key: int | None = None):
+    def write_header(self, m: Map, file: BinaryIO, encrypt_key: int | None = None):
         data = asdict(m.header).values()
         packed = struct.pack(self.map_cls.header_fmt, *data)
         file.write(self.encrypt(packed, encrypt_key))
 
-    def write_num_sectors(self, m: MapBase, file: BinaryIO):
+    def write_num_sectors(self, m: Map, file: BinaryIO):
         data = len(m.sectors)
         file.write(struct.pack('<H', data))
 
-    def write_sectors(self, m: MapBase, file: BinaryIO, encrypt_key: int | None = None):
+    def write_sectors(self, m: Map, file: BinaryIO, encrypt_key: int | None = None):
         for sector in m.sectors:
             data = asdict(sector).values()
             packed = struct.pack(self.map_cls.sector_fmt, *data)
@@ -278,23 +278,24 @@ class MapWriterBase(metaclass=abc.ABCMeta):
             if sector.extra > 0:
                 file.write(sector.extra_data)
 
-    def write_num_walls(self, m: MapBase, file: BinaryIO):
+    def write_num_walls(self, m: Map, file: BinaryIO):
         data = len(m.walls)
         file.write(struct.pack('<H', data))
 
-    def write_walls(self, m: MapBase, file: BinaryIO, encrypt_key: int | None = None):
+    def write_walls(self, m: Map, file: BinaryIO, encrypt_key: int | None = None):
         for wall in m.walls:
             data = asdict(wall).values()
+            print('data:', data)
             packed = struct.pack(self.map_cls.wall_fmt, *data)
             file.write(self.encrypt(packed, encrypt_key))
             if wall.extra > 0:
                 file.write(wall.extra_data)
 
-    def write_num_sprites(self, m: MapBase, file: BinaryIO):
+    def write_num_sprites(self, m: Map, file: BinaryIO):
         data = len(m.sprites)
         file.write(struct.pack('<H', data))
 
-    def write_sprites(self, m: MapBase, file: BinaryIO, encrypt_key: int | None = None):
+    def write_sprites(self, m: Map, file: BinaryIO, encrypt_key: int | None = None):
         for sprite in m.sprites:
             data = asdict(sprite).values()
             packed = struct.pack(self.map_cls.sprite_fmt, *data)

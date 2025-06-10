@@ -3,7 +3,7 @@ import struct
 from dataclasses import asdict, dataclass
 from typing import BinaryIO
 
-from gameengines.build.map import MapBase, MapReaderBase, MapWriterBase, Sector, Sprite, Wall
+from gameengines.build.map import Map as MapBase, MapReaderBase, MapWriterBase, Sector, Sprite, Wall
 
 
 MASTER_CRYPT_KEY = 0x7474614d
@@ -111,7 +111,7 @@ class MapWriter(MapWriterBase):
 
     map_cls = Map
 
-    def __call__(self, m: MapBase, file: BinaryIO):
+    def __call__(self, m: Map, file: BinaryIO):
         super().__call__(m, file)
         self.write_crc(m, file)
 
@@ -128,7 +128,7 @@ class MapWriter(MapWriterBase):
             return bytes(data)
         return data
 
-    def write_header(self, m: MapBase, file: BinaryIO, encrypt_key: int | None = None):
+    def write_header(self, m: Map, file: BinaryIO, encrypt_key: int | None = None):
 
         # HAXXOR
         # Need to set the head numbers.
@@ -158,24 +158,24 @@ class MapWriter(MapWriterBase):
 
         file.write(self.encrypt(foo, m.header.numwalls))
 
-    def write_num_sectors(self, m: MapBase, file: BinaryIO):
+    def write_num_sectors(self, m: Map, file: BinaryIO):
         pass
 
-    def write_sectors(self, m: MapBase, file: BinaryIO, encrypt_key: int | None = None):
+    def write_sectors(self, m: Map, file: BinaryIO, encrypt_key: int | None = None):
         super().write_sectors(m, file, encrypt_key=m.header.revision * self.sector_size)
 
-    def write_num_walls(self, m: MapBase, file: BinaryIO):
+    def write_num_walls(self, m: Map, file: BinaryIO):
         pass
 
-    def write_walls(self, m: MapBase, file: BinaryIO, encrypt_key: int | None = None):
+    def write_walls(self, m: Map, file: BinaryIO, encrypt_key: int | None = None):
         super().write_walls(m, file, encrypt_key=m.header.revision * self.sector_size | MASTER_CRYPT_KEY)
 
-    def write_num_sprites(self, m: MapBase, file: BinaryIO):
+    def write_num_sprites(self, m: Map, file: BinaryIO):
         pass
 
-    def write_sprites(self, m: MapBase, file: BinaryIO, encrypt_key: int | None = None):
+    def write_sprites(self, m: Map, file: BinaryIO, encrypt_key: int | None = None):
         super().write_sprites(m, file, encrypt_key=m.header.revision * self.sprite_size | MASTER_CRYPT_KEY)
 
-    def write_crc(self, m: MapBase, file: BinaryIO):
+    def write_crc(self, m: Map, file: BinaryIO):
         crc = binascii.crc32(file.getbuffer())
         file.write(struct.pack('<I', crc))
