@@ -93,16 +93,7 @@ class HavocMapWriter:
 
 if __name__ == '__main__':
     m1 = HavocMapReader()(sys.argv[1])
-    # HavocMapWriter()(m1, sys.argv[2])
-    # m2 = HavocMapReader()(sys.argv[2])
-    #
-    # print('name:', m1.name, m2.name)
-    # print('tiles:', m1.tiles.shape, m2.tiles.shape)
-
     m = Wolf3dMap('test', width=32, height=64)
-    # print(m.name)
-    # print(m.tiles)
-
     for x in range(10):
         for y in range(20):
             m.tiles[x][y][0] = 1

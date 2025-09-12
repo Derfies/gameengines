@@ -1,136 +1,133 @@
 import abc
 import struct
-import sys
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from typing import BinaryIO
 
 
-@dataclass(slots=True)
+@dataclass
 class Header:
 
-    version: int
-    posx: int
-    posy: int
-    posz: int
-    ang: int
-    cursectnum: int
+    version: int = 7
+    posx: int = 0
+    posy: int = 0
+    posz: int = 0
+    ang: int = 0
+    cursectnum: int = 0
 
 
-@dataclass(slots=True)
+@dataclass
 class Sector:
 
-    wallptr: int
-    wallnum: int
-    ceilingz: int
-    floorz: int
-    ceilingstat: int
-    floorstat: int
-    ceilingpicnum: int
-    ceilingheinum: int
-    ceilingshade: int
-    ceilingpal: int
-    ceilingxpanning: int
-    ceilingypanning: int
-    floorpicnum: int
-    floorheinum: int
-    floorshade: int
-    floorpal: int
-    floorxpanning: int
-    floorypanning: int
-    visibility: int
-    filler: int
-    lotag: int
-    hitag: int
-    extra: int
+    wallptr: int = 0
+    wallnum: int = 0
+    ceilingz: int = 0
+    floorz: int = 0
+    ceilingstat: int = 0
+    floorstat: int = 0
+    ceilingpicnum: int = 0
+    ceilingheinum: int = 0
+    ceilingshade: int = 0
+    ceilingpal: int = 0
+    ceilingxpanning: int = 0
+    ceilingypanning: int = 0
+    floorpicnum: int = 0
+    floorheinum: int = 0
+    floorshade: int = 0
+    floorpal: int = 0
+    floorxpanning: int = 0
+    floorypanning: int = 0
+    visibility: int = 0
+    filler: int = 0
+    lotag: int = 0
+    hitag: int = 0
+    extra: int = -1
+
+    def __post_init__(self, *args, **kwargs):
+        self.extra_data = None
 
 
-@dataclass(slots=True)
+@dataclass
 class Wall:
 
-    x: int
-    y: int
-    point2: int
-    nextwall: int
-    nextsector: int
-    cstat: int
-    picnum: int
-    overpicnum: int
-    shade: int
-    pal: int
-    xrepeat: int
-    yrepeat: int
-    xpanning: int
-    ypanning: int
-    lotag: int
-    hitag: int
-    extra: int
+    x: int = 0
+    y: int = 0
+    point2: int = -1
+    nextwall: int = -1
+    nextsector: int = -1
+    cstat: int = 0
+    picnum: int = 0
+    overpicnum: int = 0
+    shade: int = 0
+    pal: int = 0
+    xrepeat: int = 0
+    yrepeat: int = 0
+    xpanning: int = 0
+    ypanning: int = 0
+    lotag: int = 0
+    hitag: int = 0
+    extra: int = -1
+
+    def __post_init__(self):
+        self.extra_data = None
 
 
-@dataclass(slots=True)
+@dataclass
 class Sprite:
 
-    x: int
-    y: int
-    z: int
-    cstat: int
-    picnum: int
-    shade: int
-    pal: int
-    clipdist: int
-    filler: int
-    xrepeat: int
-    yrepeat: int
-    xoffset: int
-    yoffset: int
-    sectnum: int
-    statnum: int
-    ang: int
-    owner: int
-    xvel: int
-    yvel: int
-    zvel: int
-    lotag: int
-    hitag: int
-    extra: int
+    x: int = 0
+    y: int = 0
+    z: int = 0
+    cstat: int = 0
+    picnum: int = 0
+    shade: int = 0
+    pal: int = 0
+    clipdist: int = 0
+    filler: int = 0
+    xrepeat: int = 0
+    yrepeat: int = 0
+    xoffset: int = 0
+    yoffset: int = 0
+    sectnum: int = 0
+    statnum: int = 0
+    ang: int = 0
+    owner: int = 0
+    xvel: int = 0
+    yvel: int = 0
+    zvel: int = 0
+    lotag: int = 0
+    hitag: int = 0
+    extra: int = -1
+
+    def __post_init__(self):
+        self.extra_data = None
 
 
-class MapBase(metaclass=abc.ABCMeta):
+class Map:
 
-    @property
-    @abc.abstractmethod
-    def header_cls(cls):
-        """"""
-
-    @property
-    @abc.abstractmethod
-    def sector_cls(cls):
-        """"""
-
-    @property
-    @abc.abstractmethod
-    def wall_cls(cls):
-        """"""
-
-    @property
-    @abc.abstractmethod
-    def sprite_cls(cls):
-        """"""
-
-
-class Duke3dMap(MapBase):
-
+    header_fmt = '<iiiihh'
     header_cls = Header
+    sector_fmt = '<hhiihhhhbBBBhhbBBBBBhhh'
     sector_cls = Sector
+    wall_fmt = '<iihhhhhbBhBBBBhhh'
     wall_cls = Wall
+    sprite_fmt = '<iiihhbBBBBBbbhhhhhhhhhh'
     sprite_cls = Sprite
 
     def __init__(self, header=None, sectors=None, walls=None, sprites=None):
-
-        # TODO: This is probably a base class concern? All build maps have this
-        # I assume.
-        self.header = header or self.header_cls(7, 0, 0, 0, 0, 0)
+        self.header = header or self.header_cls()
         self.sectors = sectors or []
         self.walls = walls or []
         self.sprites = sprites or []
+
+    # @classmethod
+    # def from_map(cls, m: 'MapBase'):
+    #     new_header_field_names = [f.name for f in fields(cls.header_cls)]
+    #     new_header_data = {key: value for key, value in asdict(m.header).items() if key in new_header_field_names}
+    #     header = cls.header_cls(**new_header_data)
+    #     sectors = [cls.sector_cls(**asdict(sector)) for sector in m.sectors]
+    #     walls = [cls.wall_cls(**asdict(sector)) for sector in m.walls]
+    #     sprites = [cls.sprite_cls(**asdict(sector)) for sector in m.sprites]
+    #     return cls(header, sectors, walls, sprites)
 
 
 class MapReaderBase(metaclass=abc.ABCMeta):
@@ -142,97 +139,168 @@ class MapReaderBase(metaclass=abc.ABCMeta):
     """
 
     @property
-    @abc.abstractmethod
-    def header_size(cls):
-        """"""
+    def header_size(self):
+        return struct.calcsize(self.map_cls.header_fmt)
 
     @property
-    @abc.abstractmethod
-    def sector_size(cls):
-        """"""
+    def sector_size(self):
+        return struct.calcsize(self.map_cls.sector_fmt)
 
     @property
-    @abc.abstractmethod
-    def wall_size(cls):
-        """"""
+    def wall_size(self):
+        return struct.calcsize(self.map_cls.wall_fmt)
 
     @property
-    @abc.abstractmethod
-    def sprite_size(cls):
-        """"""
+    def sprite_size(self):
+        return struct.calcsize(self.map_cls.sprite_fmt)
 
     @property
     @abc.abstractmethod
     def map_cls(cls):
-        """"""
+        ...
 
-    def __call__(self, file_path: str):
-        with open(file_path, 'rb') as file:
-            header = self.get_header(file)
-            numsectors = self.get_numsectors(file)
-            sectors = self.get_sectors(file, numsectors)
-            numwalls = self.get_numwalls(file)
-            walls = self.get_walls(file, numwalls)
-            numsprites = self.get_numsprites(file)
-            sprites = self.get_sprites(file, numsprites)
+    def __call__(self, file: BinaryIO) -> Map:
+
+        # TODO: Convert all file vars to 'stream'
+        # TODO: Maybe 'num_something' is actually a member on this class...
+        # Would solve a slight artchitecture smell...
+        header = self.get_header(file)
+        num_sectors = self.get_num_sectors(file, header)
+        sectors = self.get_sectors(file, num_sectors, header)
+        num_walls = self.get_num_walls(file, header)
+        walls = self.get_walls(file, num_walls, header)
+        num_sprites = self.get_num_sprites(file, header)
+        sprites = self.get_sprites(file, num_sprites, header)
         return self.map_cls(header, sectors, walls, sprites)
 
-    def get_header(self, file):
-        data = file.read(self.header_size)
-        unpacked = struct.unpack('<iiiihh', data)
-        return Header(*unpacked)
+    @staticmethod
+    def decrypt(data: bytearray, key: int | None) -> bytearray:
+        return data
 
-    def get_numsectors(self, file):
+    def get_header(self, file: BinaryIO, decrypt_key: int | None = None) -> Header:
+        data = bytearray(file.read(self.header_size))
+        unpacked = struct.unpack(self.map_cls.header_fmt, self.decrypt(data, decrypt_key))
+        return self.map_cls.header_cls(*unpacked)
+
+    def get_num_sectors(self, file: BinaryIO, header: Header) -> int:
         return struct.unpack('<H', file.read(2))[0]
 
-    def get_sectors(self, file, numsectors):
+    def get_sectors(self, file: BinaryIO, num_sectors: int, header: Header, decrypt_key: int | None = None) -> list[Sector]:
         sectors = []
-        for _ in range(numsectors):
-            data = file.read(self.sector_size)
-            unpacked = struct.unpack('<hhiihhhhbBBBhhbBBBBBhhh', data)
-            sectors.append(Sector(*unpacked))
+        for _ in range(num_sectors):
+            data = bytearray(file.read(self.sector_size))
+            unpacked = struct.unpack(self.map_cls.sector_fmt, self.decrypt(data, decrypt_key))
+            sectors.append(self.map_cls.sector_cls(*unpacked))
         return sectors
 
-    def get_numwalls(self, file):
+    def get_num_walls(self, file: BinaryIO, header: Header) -> int:
         return struct.unpack('<H', file.read(2))[0]
 
-    def get_walls(self, file, numwalls):
+    def get_walls(self, file: BinaryIO, num_walls: int, header: Header, decrypt_key: int | None = None) -> list[Wall]:
         walls = []
-        for _ in range(numwalls):
-            data = file.read(self.wall_size)
-            unpacked = struct.unpack('<iihhhhhbBhBBBBhhh', data)
-            walls.append(Wall(*unpacked))
+        for _ in range(num_walls):
+            data = bytearray(file.read(self.wall_size))
+            unpacked = struct.unpack(self.map_cls.wall_fmt, self.decrypt(data, decrypt_key))
+            walls.append(self.map_cls.wall_cls(*unpacked))
         return walls
 
-    def get_numsprites(self, file):
+    def get_num_sprites(self, file: BinaryIO, header: Header) -> int:
         return struct.unpack('<H', file.read(2))[0]
 
-    def get_sprites(self, file, numsprites):
+    def get_sprites(self, file: BinaryIO, num_sprites: int, header: Header, decrypt_key: int | None = None) -> list[Sprite]:
         sprites = []
-        for _ in range(numsprites):
-            data = file.read(self.sprite_size)
-            unpacked = struct.unpack('<iiihhbBBBBBbbhhhhhhhhhh', data)
-            sprites.append(Sprite(*unpacked))
+        for _ in range(num_sprites):
+            data = bytearray(file.read(self.sprite_size))
+            unpacked = struct.unpack(self.map_cls.sprite_fmt, self.decrypt(data, decrypt_key))
+            sprite = self.map_cls.sprite_cls(*unpacked)
+            if sprite.extra > 0:
+                sprite.extra_data = file.read(header.x_sprite_size)
+            sprites.append(sprite)
         return sprites
 
 
-class Duke3dMapReader(MapReaderBase):
+class MapWriterBase(metaclass=abc.ABCMeta):
 
-    map_cls = Duke3dMap
-    header_size = 20
-    sector_size = 40
-    wall_size = 32
-    sprite_size = 44
+    """
+    https://moddingwiki.shikadi.net/wiki/mFormat_(Build)
+    https://fabiensanglard.net/duke3d/BUILDINF.TXT
 
+    """
 
-if __name__ == '__main__':
+    @property
+    def header_size(self):
+        return struct.calcsize(self.map_cls.header_fmt)
 
-    import time
+    @property
+    def sector_size(self):
+        return struct.calcsize(self.map_cls.sector_fmt)
 
-    start = time.time()
-    for i in range(1000):
-        m = Duke3dMapReader()(sys.argv[1])
-        foo = m.sectors[0].wallptr
-        m.sectors[0].wallptr = 0
-    end = time.time()
-    print('total', end - start)
+    @property
+    def wall_size(self):
+        return struct.calcsize(self.map_cls.wall_fmt)
+
+    @property
+    def sprite_size(self):
+        return struct.calcsize(self.map_cls.sprite_fmt)
+
+    @property
+    @abc.abstractmethod
+    def map_cls(cls):
+        ...
+
+    def __call__(self, m: Map, file: BinaryIO):
+        self.write_header(m, file)
+        self.write_num_sectors(m, file)
+        self.write_sectors(m, file)
+        self.write_num_walls(m, file)
+        self.write_walls(m, file)
+        self.write_num_sprites(m, file)
+        self.write_sprites(m, file)
+
+    @staticmethod
+    def encrypt(data: bytes, key: int | None) -> bytes:
+        return data
+
+    def write_header(self, m: Map, file: BinaryIO, encrypt_key: int | None = None):
+        data = asdict(m.header).values()
+        packed = struct.pack(self.map_cls.header_fmt, *data)
+        file.write(self.encrypt(packed, encrypt_key))
+
+    def write_num_sectors(self, m: Map, file: BinaryIO):
+        data = len(m.sectors)
+        file.write(struct.pack('<H', data))
+
+    def write_sectors(self, m: Map, file: BinaryIO, encrypt_key: int | None = None):
+        for sector in m.sectors:
+            data = asdict(sector).values()
+            packed = struct.pack(self.map_cls.sector_fmt, *data)
+            file.write(self.encrypt(packed, encrypt_key))
+            if sector.extra > 0:
+                file.write(sector.extra_data)
+
+    def write_num_walls(self, m: Map, file: BinaryIO):
+        data = len(m.walls)
+        file.write(struct.pack('<H', data))
+
+    def write_walls(self, m: Map, file: BinaryIO, encrypt_key: int | None = None):
+        for wall in m.walls:
+            data = asdict(wall).values()
+            print('data:', data)
+            packed = struct.pack(self.map_cls.wall_fmt, *data)
+            file.write(self.encrypt(packed, encrypt_key))
+            if wall.extra > 0:
+                file.write(wall.extra_data)
+
+    def write_num_sprites(self, m: Map, file: BinaryIO):
+        data = len(m.sprites)
+        file.write(struct.pack('<H', data))
+
+    def write_sprites(self, m: Map, file: BinaryIO, encrypt_key: int | None = None):
+        for sprite in m.sprites:
+            data = asdict(sprite).values()
+            packed = struct.pack(self.map_cls.sprite_fmt, *data)
+            file.write(self.encrypt(packed, encrypt_key))
+
+            # TODO: Conversion breaks here.
+            if sprite.extra > 0 and sprite.extra_data is not None:
+                file.write(sprite.extra_data)
