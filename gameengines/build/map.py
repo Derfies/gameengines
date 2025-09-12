@@ -57,8 +57,9 @@ class Wall:
     cstat: int = 0
     picnum: int = 0
     overpicnum: int = 0
-    shade: int = 0
+    #shade: int = 0 # Wtf these seem swapped for eduke / nblood?
     pal: int = 0
+    shade: int = 0
     xrepeat: int = 0
     yrepeat: int = 0
     xpanning: int = 0
