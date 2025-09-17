@@ -32,7 +32,7 @@ class Grp:
                 entries.append((name, size))
 
             for name, size in entries:
-                print('FOUND:', name)
+                #print('FOUND:', name)
                 data = f.read(size)
                 if name.lower().endswith('.art'):
                     self.textures.extend(self.load_art(data))
